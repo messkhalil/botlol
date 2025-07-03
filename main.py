@@ -75,7 +75,7 @@ def get_algeria_time():
 def get_surah_audio(surah_number):
     """الحصول على سورة كاملة بصوت"""
     try:
-        response = requests.get(f"")
+        response = requests.get(f"https://cdn.islamic.network/quran/audio-surah/128k/ar.abdulbasitmurattal/{number}.mp3")
         data = response.json()
         
         if data['code'] == 200:
