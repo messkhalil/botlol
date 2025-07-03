@@ -89,7 +89,7 @@ def send_random_verse(context):
 def send_quran_audio(update: Update, context: CallbackContext):
     surah = random.randint(1, 114)
     surah_str = str(surah).zfill(3)
-    url = f"https://server.mp3quran.net/s_gmd/{surah_str}.mp3"
+     url = f"https://server7.mp3quran.net/s_gmd/{surah_str}.mp3""
     try:
         context.bot.send_audio(update.effective_chat.id, audio=url, caption=f"🎧 تلاوة سورة رقم {surah}")
     except Exception as e:
