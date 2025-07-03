@@ -74,15 +74,25 @@ def get_algeria_time():
 
 def get_surah_audio(surah_number):
     """الحصول على سورة كاملة بصوت"""
-    try:
-        response = requests.get(f"https://cdn.islamic.network/quran/audio-surah/128k/ar.abdulbasitmurattal/{number}.mp3")
-        data = response.json()
+try:
+        # روابط السور الكاملة بصوت الشيخ السديس
+        surah_map = {
+            1: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/001.mp3",
+            2: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/002.mp3",
+            36: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/036.mp3",
+            55: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/055.mp3",
+            56: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/056.mp3",
+            67: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/067.mp3",
+            112: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/112.mp3",
+            113: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/113.mp3",
+            114: "https://everyayah.com/data/Saood_ash-Shuraym_64kbps/114.mp3"
+        }
         
-        if data['code'] == 200:
+        if surah_number in surah_map:
             return {
-                'name': data['data']['name'],
-                'english_name': data['data']['englishName'],
-                'ayahs': data['data']['ayahs']
+                'audio': surah_map[surah_number],
+                'name': f"سورة رقم {surah_number}",
+                'source': "everyayah.com - الشيخ السديس"
             }
     except Exception as e:
         logger.error(f"خطأ في جلب السورة: {e}")
