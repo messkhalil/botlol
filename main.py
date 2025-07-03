@@ -5,72 +5,24 @@ from datetime import datetime
 import requests
 import logging
 from telegram import Bot, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
 # إعدادات البوت
 BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
-ADMIN_ID = 6212199357  # أضف آيدي حسابك هنا
+ADMIN_ID = 6212199357
 
-# قوائم الأذكار الكبيرة والمتنوعة
-MORNING_ADHKAR = [
-    "أصبحنا وأصبح الملك لله، والحمد لله، لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير.",
-    "اللهم بك أصبحنا، وبك أمسينا، وبك نحيا، وبك نموت، وإليك النشور.",
-    "سبحان الله وبحمده عدد خلقه ورضا نفسه وزنة عرشه ومداد كلماته.",
-    "اللهم إني أصبحت منك في نعمة وعافية وستر، فأتم نعمتك علي وعافيتك وسترك في الدنيا والآخرة.",
-    "أصبحنا على فطرة الإسلام، وكلمة الإخلاص، ودين نبينا محمد صلى الله عليه وسلم، وملة أبينا إبراهيم حنيفاً مسلماً وما كان من المشركين.",
-    "اللهم ما أصبح بي من نعمة أو بأحد من خلقك فمنك وحدك لا شريك لك، فلك الحمد ولك الشكر.",
-    "حسبي الله لا إله إلا هو، عليه توكلت وهو رب العرش العظيم.",
-    "اللهم إني أسألك علماً نافعاً، ورزقاً طيباً، وعملاً متقبلاً.",
-    "سبحان الله العظيم وبحمده، لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير.",
-    "أعوذ بكلمات الله التامات من شر ما خلق."
-]
+# قوائم الأذكار
+MORNING_ADHKAR = ["أصبحنا وأصبح الملك لله...", "اللهم بك أصبحنا..."]
+EVENING_ADHKAR = ["أمسينا وأمسى الملك لله...", "اللهم بك أمسينا..."]
+NIGHT_ADHKAR = ["باسم الله الذي لا يضر...", "آية الكرسي..."]
+QURAN_VERSES = ["إِنَّ مَعَ الْعُسْرِ يُسْرًا...", "وَمَن يَتَّقِ اللَّهَ..."]
 
-EVENING_ADHKAR = [
-    "أمسينا وأمسى الملك لله، والحمد لله، لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير.",
-    "اللهم بك أمسينا، وبك أصبحنا، وبك نحيا، وبك نموت، وإليك المصير.",
-    "أعوذ بكلمات الله التامات من شر ما خلق.",
-    "اللهم إني أمسيت منك في نعمة وعافية وستر، فأتم نعمتك علي وعافيتك وسترك في الدنيا والآخرة.",
-    "أمسينا على فطرة الإسلام، وكلمة الإخلاص، ودين نبينا محمد صلى الله عليه وسلم، وملة أبينا إبراهيم حنيفاً مسلماً وما كان من المشركين.",
-    "اللهم ما أمسى بي من نعمة أو بأحد من خلقك فمنك وحدك لا شريك لك، فلك الحمد ولك الشكر.",
-    "حسبي الله لا إله إلا هو، عليه توكلت وهو رب العرش العظيم.",
-    "اللهم إني أسألك العفو والعافية في الدنيا والآخرة، اللهم إني أسألك العفو والعافية في ديني ودنياي وأهلي ومالي.",
-    "سبحان الله العظيم وبحمده، لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير.",
-    "أعوذ بالله من الشيطان الرجيم: {آية الكرسي}"
-]
-
-NIGHT_ADHKAR = [
-    "باسم الله الذي لا يضر مع اسمه شيء في الأرض ولا في السماء وهو السميع العليم.",
-    "آية الكرسي: الله لا إله إلا هو الحي القيوم لا تأخذه سنة ولا نوم له ما في السماوات وما في الأرض...",
-    "أعوذ برب الفلق، من شر ما خلق، ومن شر غاسق إذا وقب، ومن شر النفاثات في العقد، ومن شر حاسد إذا حسد.",
-    "أعوذ برب الناس، ملك الناس، إله الناس، من شر الوسواس الخناس، الذي يوسوس في صدور الناس، من الجنة والناس.",
-    "اللهم رب السماوات ورب الأرض ورب العرش العظيم، ربنا ورب كل شيء، فالق الحب والنوى، ومنزل التوراة والإنجيل والفرقان، أعوذ بك من شر كل شيء أنت آخذ بناصيته، اللهم أنت الأول فليس قبلك شيء، وأنت الآخر فليس بعدك شيء، وأنت الظاهر فليس فوقك شيء، وأنت الباطن فليس دونك شيء، اقض عنا الدين وأغننا من الفقر.",
-    "بسم الله وضعت جنبي، اللهم اغفر لي ذنبي، وأخسئ شيطاني، وفك رهاني، واجعلني في الندي الأعلى.",
-    "اللهم أسلمت نفسي إليك، ووجهت وجهي إليك، وفوضت أمري إليك، وألجأت ظهري إليك، رغبة ورهبة إليك، لا ملجأ ولا منجا منك إلا إليك، آمنت بكتابك الذي أنزلت، وبنبيك الذي أرسلت.",
-    "سبحان الله (33 مرة)، الحمد لله (33 مرة)، الله أكبر (34 مرة).",
-    "لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير.",
-    "اللهم عالم الغيب والشهادة، فاطر السماوات والأرض، رب كل شيء ومليكه، أشهد أن لا إله إلا أنت، أعوذ بك من شر نفسي ومن شر الشيطان وشركه."
-]
-
-QURAN_VERSES = [
-    "إِنَّ مَعَ الْعُسْرِ يُسْرًا ﴿٥﴾ فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ﴿٦﴾ (الشرح:5-6)",
-    "وَمَن يَتَّقِ اللَّهَ يَجْعَل لَّهُ مَخْرَجًا ﴿٢﴾ وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ (الطلاق:2-3)",
-    "رَّبِّ أَدْخِلْنِي مُدْخَلَ صِدْقٍ وَأَخْرِجْنِي مُخْرَجَ صِدْقٍ وَاجْعَل لِّي مِن لَّدُنكَ سُلْطَانًا نَّصِيرًا (الإسراء:80)",
-    "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ (آية الكرسي)",
-    "وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ (الطلاق:3)",
-    "فَإِنَّ اللَّهَ هُوَ الْغَفُورُ الرَّحِيمُ (الحشر:22)",
-    "وَقُل رَّبِّ أَنزِلْنِي مُنزَلًا مُّبَارَكًا وَأَنتَ خَيْرُ الْمُنزِلِينَ (المؤمنون:29)",
-    "وَذَكِّرْ فَإِنَّ الذِّكْرَىٰ تَنفَعُ الْمُؤْمِنِينَ (الذاريات:55)",
-    "وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ أُجِيبُ دَعْوَةَ الدَّاعِ إِذَا دَعَانِ (البقرة:186)",
-    "وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ عَلَيْهِ تَوَكَّلْتُ وَإِلَيْهِ أُنِيبُ (هود:88)"
-]
-
+# متغيرات البوت
 active_users = set()
 verse_sent_today = set()
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+# إعداد السجلات
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_algeria_time():
@@ -79,7 +31,6 @@ def get_algeria_time():
 def start(update: Update, context: CallbackContext):
     user = update.effective_user
     user_id = user.id
-
     if user_id not in active_users:
         active_users.add(user_id)
         welcome_msg = (
@@ -92,15 +43,11 @@ def start(update: Update, context: CallbackContext):
             "📜 *الأوامر المتاحة:*\n"
             "/start - عرض هذه الرسالة\n"
             "/quran - استماع إلى تلاوة قرآنية\n"
+            "/sura 36 - سورة محددة\n"
             "/adhkar - عرض أذكار متنوعة\n"
-            "/verse - آية قرآنية متنوعة\n\n"
-            "سيتم إرسال آية قرآنية مكتوبة كل ساعة إن شاء الله"
+            "/verse - آية قرآنية عشوائية"
         )
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=welcome_msg,
-            parse_mode="Markdown"
-        )
+        context.bot.send_message(chat_id=update.effective_chat.id, text=welcome_msg, parse_mode="Markdown")
         current_hour = get_algeria_time()
         if 6 <= current_hour < 9:
             send_morning_adhkar(context, user_id)
@@ -122,7 +69,6 @@ def send_night_adhkar(context: CallbackContext, chat_id):
     context.bot.send_message(chat_id=chat_id, text=f"🌌 *ذكر النوم*\n\n{zikr}", parse_mode="Markdown")
 
 def send_random_verse(context: CallbackContext):
-    today = datetime.now().strftime("%Y-%m-%d")
     for user_id in active_users:
         verse = random.choice(QURAN_VERSES)
         while verse in verse_sent_today:
@@ -130,36 +76,50 @@ def send_random_verse(context: CallbackContext):
         verse_sent_today.add(verse)
         context.bot.send_message(chat_id=user_id, text=f"📖 *آية قرآنية*\n\n{verse}", parse_mode="Markdown")
 
-def send_quran_audio(update: Update, context: CallbackContext):
-    try:
-        surah_number = random.randint(1, 114)
-        api_url = f"https://api.quran.com/v4/recitations/7/by_surah/{surah_number}"
-        response = requests.get(api_url)
-        response.raise_for_status()
-        data = response.json()
-        audio_url = data["audio_files"][0]["audio_url"]
-        surah_key = data["audio_files"][0]["verse_key"].split(":")[0]
-
-        context.bot.send_audio(
-            chat_id=update.effective_chat.id,
-            audio=audio_url,
-            caption=f"🎧 تلاوة من سورة رقم {surah_key}"
-        )
-    except Exception as e:
-        logger.error(f"⚠️ خطأ في جلب التلاوة: {e}")
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="⚠️ حدث خطأ أثناء تحميل التلاوة. حاول مرة أخرى لاحقاً."
-        )
+def send_random_verse_command(update: Update, context: CallbackContext):
+    verse = random.choice(QURAN_VERSES)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=f"📖 *آية قرآنية*\n\n{verse}", parse_mode="Markdown")
 
 def send_random_adhkar(update: Update, context: CallbackContext):
     all_adhkar = MORNING_ADHKAR + EVENING_ADHKAR + NIGHT_ADHKAR
     zikr = random.choice(all_adhkar)
     context.bot.send_message(chat_id=update.effective_chat.id, text=f"📿 *ذكر متنوع*\n\n{zikr}", parse_mode="Markdown")
 
-def send_random_verse_command(update: Update, context: CallbackContext):
-    verse = random.choice(QURAN_VERSES)
-    context.bot.send_message(chat_id=update.effective_chat.id, text=f"📖 *آية قرآنية*\n\n{verse}", parse_mode="Markdown")
+def send_quran_audio(update: Update, context: CallbackContext):
+    try:
+        surah_number = random.randint(1, 114)
+        edition = "ar.alafasy"
+        api_url = f"http://api.alquran.cloud/v1/quran/{edition}"
+        resp = requests.get(api_url)
+        resp.raise_for_status()
+        data = resp.json()
+        surah = data["data"]["surahs"][surah_number - 1]
+        audio_url = surah["audio"]
+        context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio_url, caption=f"🎧 تلاوة سورة {surah['englishName']}")
+    except Exception as e:
+        logger.error(f"خطأ في جلب التلاوة: {e}")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="❌ حدث خطأ أثناء تحميل التلاوة.")
+
+def send_specific_surah_audio(update: Update, context: CallbackContext):
+    try:
+        if not context.args:
+            update.message.reply_text("❗️ من فضلك أرسل رقم السورة مثل: /sura 55")
+            return
+        surah_number = int(context.args[0])
+        if not 1 <= surah_number <= 114:
+            update.message.reply_text("❗️ رقم السورة يجب أن يكون بين 1 و 114.")
+            return
+        edition = "ar.alafasy"
+        api_url = f"http://api.alquran.cloud/v1/quran/{edition}"
+        resp = requests.get(api_url)
+        resp.raise_for_status()
+        data = resp.json()
+        surah = data["data"]["surahs"][surah_number - 1]
+        audio_url = surah["audio"]
+        context.bot.send_audio(chat_id=update.effective_chat.id, audio=audio_url, caption=f"🎧 تلاوة سورة {surah['englishName']}")
+    except Exception as e:
+        logger.error(f"خطأ في أمر /sura: {e}")
+        update.message.reply_text("⚠️ حدث خطأ أثناء جلب التلاوة.")
 
 def scheduled_jobs(context: CallbackContext):
     current_hour = get_algeria_time()
@@ -182,6 +142,7 @@ def main():
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("quran", send_quran_audio))
+    dispatcher.add_handler(CommandHandler("sura", send_specific_surah_audio))
     dispatcher.add_handler(CommandHandler("adhkar", send_random_adhkar))
     dispatcher.add_handler(CommandHandler("verse", send_random_verse_command))
     dispatcher.add_error_handler(error_handler)
