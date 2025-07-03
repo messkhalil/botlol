@@ -8,8 +8,8 @@ from telegram import Bot, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # إعدادات البوت
-BOT_TOKEN = "توكن_بوتك_هنا"
-ADMIN_ID = 123456789  # أضف آيدي حسابك هنا
+BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
+ADMIN_ID = 6212199357  # أضف آيدي حسابك هنا
 
 # قوائم الأذكار الكبيرة والمتنوعة
 MORNING_ADHKAR = [
