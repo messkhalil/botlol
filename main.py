@@ -6,9 +6,11 @@ from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
+# إعدادات البوت
 BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
 ADMIN_ID = 6212199357
 
+# إعدادات التسجيل
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -70,7 +72,7 @@ QURAN_VERSES = [
 
 # تخزين بيانات المستخدمين
 active_users = set()
-user_data = {}  # لتخزين معلومات إضافية عن المستخدمين
+user_data = {}
 
 def get_algeria_time():
     """الحصول على وقت الجزائر مع التنسيق"""
@@ -238,6 +240,19 @@ def send_random_adhkar(update: Update, context: CallbackContext):
         f"📿 ذكر عشوائي | {time_str}\n\n{random.choice(all_adhkar)}"
     )
 
+def send_random_verse(update: Update, context: CallbackContext):
+    """إرسال آية قرآنية مكتوبة عشوائية"""
+    now, time_str = get_algeria_time()
+    verse = random.choice(QURAN_VERSES)
+    
+    response = (
+        f"📖 آية قرآنية | {time_str}\n\n"
+        f"{verse}\n\n"
+        f"🔖 {random.choice(['تذكر هذه الآية اليوم', 'اجعل هذه الآية شعارك اليوم', 'ما أعظم كلام الله'])}"
+    )
+    
+    update.message.reply_text(response)
+
 def time_left(update: Update, context: CallbackContext):
     """عرض الوقت المتبقي للأذكار القادمة"""
     adhkar_type, hours, minutes, next_time = get_next_adhkar_time()
@@ -249,7 +264,7 @@ def time_left(update: Update, context: CallbackContext):
     update.message.reply_text(message)
 
 def list_users(update: Update, context: CallbackContext):
-    """عرض قائمة المستخدمين (للمشرف فقط)"""
+    """عرض قائمة المستخدمين مع الأسماء (للمشرف فقط)"""
     if update.effective_user.id != ADMIN_ID:
         update.message.reply_text("⚠️ هذا الأمر متاح للمشرف فقط!")
         return
@@ -258,12 +273,22 @@ def list_users(update: Update, context: CallbackContext):
         update.message.reply_text("لا يوجد مستخدمين نشطين حالياً")
         return
     
-    users_list = "\n".join([f"👤 {uid}" for uid in active_users])
+    users_list = []
+    for uid in active_users:
+        user_info = user_data.get(uid, {})
+        name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+        username = f"@{user_info.get('username', '')}" if user_info.get('username') else "لا يوجد معرف"
+        
+        user_entry = f"👤 {name} (ID: {uid}) - {username}"
+        users_list.append(user_entry)
+    
+    users_text = "\n".join(users_list)
+    
     update.message.reply_text(
         f"📊 إحصائيات البوت:\n"
         f"• عدد المستخدمين النشطين: {len(active_users)}\n"
         f"• آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"قائمة المستخدمين:\n{users_list}"
+        f"قائمة المستخدمين:\n{users_text}"
     )
 
 def start(update: Update, context: CallbackContext):
@@ -291,6 +316,7 @@ def start(update: Update, context: CallbackContext):
 /quran - تلاوة قرآنية عشوائية
 /sura [رقم] - سورة كاملة (مثال: /sura 1)
 /adhkar - ذكر عشوائي
+/verse - آية قرآنية مكتوبة
 /timeleft - الوقت المتبقي للأذكار القادمة
 
 تم تطوير البوت بواسطة خليل
@@ -318,6 +344,7 @@ def main():
     dp.add_handler(CommandHandler("quran", send_quran_audio))
     dp.add_handler(CommandHandler("sura", send_surah))
     dp.add_handler(CommandHandler("adhkar", send_random_adhkar))
+    dp.add_handler(CommandHandler("verse", send_random_verse))
     dp.add_handler(CommandHandler("timeleft", time_left))
     dp.add_handler(CommandHandler("users", list_users))
     
