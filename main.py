@@ -9,10 +9,13 @@ from telegram.ext import Updater, CommandHandler, CallbackContext
 BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
 ADMIN_ID = 6212199357
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-# قوائم الأذكار (يجب استكمالها)
+# قوائم الأذكار
 MORNING_ADHKAR = [
     "أصبحنا وأصبح الملك لله، والحمد لله، لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير.",
     "اللهم بك أصبحنا، وبك أمسينا، وبك نحيا، وبك نموت، وإليك النشور.",
@@ -65,12 +68,38 @@ QURAN_VERSES = [
     "وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ عَلَيْهِ تَوَكَّلْتُ وَإِلَيْهِ أُنِيبُ (هود:88)"
 ]
 
+# تخزين بيانات المستخدمين
 active_users = set()
+user_data = {}  # لتخزين معلومات إضافية عن المستخدمين
 
 def get_algeria_time():
     """الحصول على وقت الجزائر مع التنسيق"""
     now = datetime.utcnow() + timedelta(hours=1)  # UTC+1
     return now, now.strftime("%H:%M")
+
+def get_next_adhkar_time():
+    """حساب الوقت المتبقي للأذكار القادمة"""
+    now, _ = get_algeria_time()
+    hour = now.hour
+    
+    if hour < 6:
+        next_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
+        adhkar_type = "أذكار الصباح"
+    elif 6 <= hour < 18:
+        next_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
+        adhkar_type = "أذكار المساء"
+    elif 18 <= hour < 21:
+        next_time = now.replace(hour=21, minute=0, second=0, microsecond=0)
+        adhkar_type = "أذكار الليل"
+    else:
+        next_time = (now + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
+        adhkar_type = "أذكار الصباح"
+    
+    time_left = next_time - now
+    hours = time_left.seconds // 3600
+    minutes = (time_left.seconds % 3600) // 60
+    
+    return adhkar_type, hours, minutes, next_time.strftime("%H:%M")
 
 def get_surah_audio(surah_number):
     """الحصول على سورة كاملة بصوت"""
@@ -168,26 +197,38 @@ def send_surah(update: Update, context: CallbackContext):
 def send_morning_adhkar(context: CallbackContext):
     now, time_str = get_algeria_time()
     for uid in active_users:
-        context.bot.send_message(
-            uid,
-            f"🌞 ذكر الصباح | {time_str}\n\n{random.choice(MORNING_ADHKAR)}"
-        )
+        try:
+            context.bot.send_message(
+                uid,
+                f"🌞 ذكر الصباح | {time_str}\n\n{random.choice(MORNING_ADHKAR)}"
+            )
+        except Exception as e:
+            logger.error(f"خطأ في إرسال ذكر الصباح للمستخدم {uid}: {e}")
+            active_users.discard(uid)
 
 def send_evening_adhkar(context: CallbackContext):
     now, time_str = get_algeria_time()
     for uid in active_users:
-        context.bot.send_message(
-            uid,
-            f"🌙 ذكر المساء | {time_str}\n\n{random.choice(EVENING_ADHKAR)}"
-        )
+        try:
+            context.bot.send_message(
+                uid,
+                f"🌙 ذكر المساء | {time_str}\n\n{random.choice(EVENING_ADHKAR)}"
+            )
+        except Exception as e:
+            logger.error(f"خطأ في إرسال ذكر المساء للمستخدم {uid}: {e}")
+            active_users.discard(uid)
 
 def send_night_adhkar(context: CallbackContext):
     now, time_str = get_algeria_time()
     for uid in active_users:
-        context.bot.send_message(
-            uid,
-            f"🌌 ذكر النوم | {time_str}\n\n{random.choice(NIGHT_ADHKAR)}"
-        )
+        try:
+            context.bot.send_message(
+                uid,
+                f"🌌 ذكر النوم | {time_str}\n\n{random.choice(NIGHT_ADHKAR)}"
+            )
+        except Exception as e:
+            logger.error(f"خطأ في إرسال ذكر الليل للمستخدم {uid}: {e}")
+            active_users.discard(uid)
 
 def send_random_adhkar(update: Update, context: CallbackContext):
     """إرسال ذكر عشوائي"""
@@ -197,21 +238,60 @@ def send_random_adhkar(update: Update, context: CallbackContext):
         f"📿 ذكر عشوائي | {time_str}\n\n{random.choice(all_adhkar)}"
     )
 
+def time_left(update: Update, context: CallbackContext):
+    """عرض الوقت المتبقي للأذكار القادمة"""
+    adhkar_type, hours, minutes, next_time = get_next_adhkar_time()
+    message = (
+        f"⏳ الأذكار القادمة: {adhkar_type}\n"
+        f"⏱ الوقت المتبقي: {hours} ساعة و {minutes} دقيقة\n"
+        f"🕒 الموعد: {next_time}"
+    )
+    update.message.reply_text(message)
+
+def list_users(update: Update, context: CallbackContext):
+    """عرض قائمة المستخدمين (للمشرف فقط)"""
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⚠️ هذا الأمر متاح للمشرف فقط!")
+        return
+    
+    if not active_users:
+        update.message.reply_text("لا يوجد مستخدمين نشطين حالياً")
+        return
+    
+    users_list = "\n".join([f"👤 {uid}" for uid in active_users])
+    update.message.reply_text(
+        f"📊 إحصائيات البوت:\n"
+        f"• عدد المستخدمين النشطين: {len(active_users)}\n"
+        f"• آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        f"قائمة المستخدمين:\n{users_list}"
+    )
+
 def start(update: Update, context: CallbackContext):
     now, time_str = get_algeria_time()
-    uid = update.effective_user.id
+    user = update.effective_user
+    uid = user.id
+    
+    # تخزين معلومات المستخدم
     active_users.add(uid)
+    user_data[uid] = {
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'username': user.username,
+        'join_date': now.strftime("%Y-%m-%d %H:%M:%S")
+    }
     
     start_msg = f"""
 ✨ *مرحباً بك في بوت الأذكار والقرآن* ✨
 
+👋 أهلًا وسهلاً بك {user.first_name}!
 🕒 توقيت الجزائر: {time_str}
 
 ⚡️ *الأوامر المتاحة:*
 /start - عرض هذه الرسالة
-/quran - تلاوة عشوائية
-/sura [رقم] - سورة كاملة
+/quran - تلاوة قرآنية عشوائية
+/sura [رقم] - سورة كاملة (مثال: /sura 1)
 /adhkar - ذكر عشوائي
+/timeleft - الوقت المتبقي للأذكار القادمة
 
 تم تطوير البوت بواسطة خليل
 """
@@ -222,11 +302,11 @@ def scheduled_jobs(context: CallbackContext):
     now, time_str = get_algeria_time()
     hour = now.hour
     
-    if 6 <= hour < 9:
+    if 5 <= hour < 10:  # الصباح من 5 إلى 10 ص
         send_morning_adhkar(context)
-    elif 18 <= hour < 21:
+    elif 17 <= hour < 21:  # المساء من 5 إلى 9 م
         send_evening_adhkar(context)
-    elif 21 <= hour < 23:
+    elif 21 <= hour or hour < 5:  # الليل من 9 م إلى 5 ص
         send_night_adhkar(context)
 
 def main():
@@ -238,12 +318,16 @@ def main():
     dp.add_handler(CommandHandler("quran", send_quran_audio))
     dp.add_handler(CommandHandler("sura", send_surah))
     dp.add_handler(CommandHandler("adhkar", send_random_adhkar))
+    dp.add_handler(CommandHandler("timeleft", time_left))
+    dp.add_handler(CommandHandler("users", list_users))
     
     # الجدولة
     job_queue = updater.job_queue
     job_queue.run_repeating(scheduled_jobs, interval=3600, first=0)
     
+    # بدء البوت
     updater.start_polling()
+    logger.info("تم تشغيل البوت بنجاح...")
     updater.idle()
 
 if __name__ == "__main__":
