@@ -8,7 +8,7 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
 # إعدادات البوت
-BOT_TOKEN = "ضع توكن البوت هنا"
+BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
 ADMIN_ID = 6212199357  # آيدي الأدمن
 
 # قوائم الأذكار
