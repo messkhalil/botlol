@@ -9,8 +9,8 @@ import logging
 
 # إعدادات البوت
 ADMIN_USERNAME = "messaoudi_khalil"
-BOT_USERNAME = "your_bot_username"
-BOT_PASSWORD = "your_bot_password"
+BOT_USERNAME = "adhkar122025"
+BOT_PASSWORD = "kham2006"
 
 # قوائم الأذكار
 MORNING_ADHKAR = [
