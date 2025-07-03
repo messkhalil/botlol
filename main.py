@@ -67,15 +67,11 @@ QURAN_VERSES = [
 active_users = set()
 
 def get_algeria_time():
-    """الحصول على وقت الجزائر مع التنسيق"""
-    now = datetime.utcnow() + timedelta(hours=1)  # UTC+1
+    now = datetime.utcnow() + timedelta(hours=1)
     return now, now.strftime("%H:%M")
 
 def get_surah_audio(surah_number):
-    """الحصول على رابط السورة كاملة بصوت"""
     try:
-        # هذه روابط مباشرة لسور كاملة بصوت الشيخ مشاري العفاسي
-        # يمكنك استبدالها بمصدر آخر يوفر سور كاملة في ملف واحد
         surah_audio_map = {
             1: "https://server.mp3quran.net/afs/001.mp3",
             2: "https://server.mp3quran.net/afs/002.mp3",
@@ -91,21 +87,58 @@ def get_surah_audio(surah_number):
                 'name': f"السورة رقم {surah_number}"
             }
         
-        # إذا لم تكن السورة في القائمة، نستخدم API
         response = requests.get(f"https://api.alquran.cloud/v1/surah/{surah_number}/ar.alafasy")
         data = response.json()
         
         if data['code'] == 200:
             return {
-                'audio': data['data']['ayahs'][0]['audio'],  # نستخدم أول آية كمثال
+                'audio': data['data']['ayahs'][0]['audio'],
                 'name': data['data']['name']
             }
     except Exception as e:
         logger.error(f"خطأ في جلب السورة: {e}")
     return None
 
+def start(update: Update, context: CallbackContext):
+    now, time_str = get_algeria_time()
+    uid = update.effective_user.id
+    active_users.add(uid)
+    
+    start_msg = f"""
+✨ *مرحباً بك في بوت الأذكار والقرآن* ✨
+
+🕒 توقيت الجزائر: {time_str}
+
+⚡️ *الأوامر المتاحة:*
+/start - عرض هذه الرسالة
+/quran - تلاوة عشوائية
+/sura [رقم] - سورة كاملة
+/adhkar - ذكر عشوائي
+
+تم تطوير البوت بواسطة خليل
+"""
+    update.message.reply_text(start_msg, parse_mode="Markdown")
+
+def send_quran_audio(update: Update, context: CallbackContext):
+    now, time_str = get_algeria_time()
+    surah = random.randint(1, 114)
+    surah_data = get_surah_audio(surah)
+    
+    if surah_data:
+        try:
+            update.message.reply_text(f"جاري إرسال تلاوة من {surah_data['name']}")
+            context.bot.send_audio(
+                chat_id=update.effective_chat.id,
+                audio=surah_data['audio'],
+                caption=f"تلاوة قرآنية | {time_str}"
+            )
+        except Exception as e:
+            logger.error(f"خطأ في إرسال التلاوة: {e}")
+            update.message.reply_text("⚠️ حدث خطأ أثناء إرسال التلاوة")
+    else:
+        update.message.reply_text("⚠️ تعذر جلب التلاوة، حاول لاحقاً")
+
 def send_surah(update: Update, context: CallbackContext):
-    """إرسال سورة كاملة في ملف صوتي واحد"""
     now, time_str = get_algeria_time()
     
     if not context.args:
@@ -141,7 +174,47 @@ def send_surah(update: Update, context: CallbackContext):
         logger.error(f"خطأ في إرسال السورة: {e}")
         update.message.reply_text("⚠️ حدث خطأ أثناء إرسال السورة")
 
-# ... (بقية الدوال كما هي في الكود السابق) ...
+def send_random_adhkar(update: Update, context: CallbackContext):
+    now, time_str = get_algeria_time()
+    all_adhkar = MORNING_ADHKAR + EVENING_ADHKAR + NIGHT_ADHKAR
+    update.message.reply_text(
+        f"📿 ذكر عشوائي | {time_str}\n\n{random.choice(all_adhkar)}"
+    )
+
+def send_morning_adhkar(context: CallbackContext):
+    now, time_str = get_algeria_time()
+    for uid in active_users:
+        context.bot.send_message(
+            uid,
+            f"🌞 ذكر الصباح | {time_str}\n\n{random.choice(MORNING_ADHKAR)}"
+        )
+
+def send_evening_adhkar(context: CallbackContext):
+    now, time_str = get_algeria_time()
+    for uid in active_users:
+        context.bot.send_message(
+            uid,
+            f"🌙 ذكر المساء | {time_str}\n\n{random.choice(EVENING_ADHKAR)}"
+        )
+
+def send_night_adhkar(context: CallbackContext):
+    now, time_str = get_algeria_time()
+    for uid in active_users:
+        context.bot.send_message(
+            uid,
+            f"🌌 ذكر النوم | {time_str}\n\n{random.choice(NIGHT_ADHKAR)}"
+        )
+
+def scheduled_jobs(context: CallbackContext):
+    now, time_str = get_algeria_time()
+    hour = now.hour
+    
+    if 6 <= hour < 9:
+        send_morning_adhkar(context)
+    elif 18 <= hour < 21:
+        send_evening_adhkar(context)
+    elif 21 <= hour < 23:
+        send_night_adhkar(context)
 
 def main():
     updater = Updater(BOT_TOKEN, use_context=True)
