@@ -232,6 +232,23 @@ def send_night_adhkar(context: CallbackContext):
             logger.error(f"خطأ في إرسال ذكر الليل للمستخدم {uid}: {e}")
             active_users.discard(uid)
 
+def send_auto_verse(context: CallbackContext):
+    """إرسال آية قرآنية تلقائية كل 35 دقيقة"""
+    now, time_str = get_algeria_time()
+    verse = random.choice(QURAN_VERSES)
+    
+    for uid in active_users:
+        try:
+            context.bot.send_message(
+                uid,
+                f"📖 آية قرآنية تلقائية | {time_str}\n\n"
+                f"{verse}\n\n"
+                f"🔖 {random.choice(['تأمل هذه الآية', 'اجعل هذه الآية ذكرك اليوم', 'ما أعظم كلام الله'])}"
+            )
+        except Exception as e:
+            logger.error(f"خطأ في إرسال الآية التلقائية للمستخدم {uid}: {e}")
+            active_users.discard(uid)
+
 def send_random_adhkar(update: Update, context: CallbackContext):
     """إرسال ذكر عشوائي"""
     now, time_str = get_algeria_time()
@@ -319,6 +336,8 @@ def start(update: Update, context: CallbackContext):
 /verse - آية قرآنية مكتوبة
 /timeleft - الوقت المتبقي للأذكار القادمة
 
+📖 سيتم إرسال آية قرآنية تلقائياً كل 35 دقيقة
+
 تم تطوير البوت بواسطة خليل
 """
     update.message.reply_text(start_msg, parse_mode="Markdown")
@@ -351,6 +370,7 @@ def main():
     # الجدولة
     job_queue = updater.job_queue
     job_queue.run_repeating(scheduled_jobs, interval=3600, first=0)
+    job_queue.run_repeating(send_auto_verse, interval=2100, first=0)  # كل 35 دقيقة
     
     # بدء البوت
     updater.start_polling()
