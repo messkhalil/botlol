@@ -5,7 +5,7 @@ import time
 import filetype   
 from datetime import datetime, timedelta
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler
 
 # إعدادات البوت
 BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
@@ -356,27 +356,25 @@ def scheduled_jobs(context: CallbackContext):
         send_night_adhkar(context)
 
 def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    # استبدل Updater بـ Application
+    application = Application.builder().token(BOT_TOKEN).build()
     
     # تعريف الأوامر
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("quran", send_quran_audio))
-    dp.add_handler(CommandHandler("sura", send_surah))
-    dp.add_handler(CommandHandler("adhkar", send_random_adhkar))
-    dp.add_handler(CommandHandler("verse", send_random_verse))
-    dp.add_handler(CommandHandler("timeleft", time_left))
-    dp.add_handler(CommandHandler("users", list_users))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("quran", send_quran_audio))
+    application.add_handler(CommandHandler("sura", send_surah))
+    application.add_handler(CommandHandler("adhkar", send_random_adhkar))
+    application.add_handler(CommandHandler("verse", send_random_verse))
+    application.add_handler(CommandHandler("timeleft", time_left))
+    application.add_handler(CommandHandler("users", list_users))
     
-    # الجدولة
-    job_queue = updater.job_queue
-    job_queue.run_repeating(scheduled_jobs, interval=3600, first=0)
-    job_queue.run_repeating(send_auto_verse, interval=2100, first=0)  # كل 35 دقيقة
+    # الجدولة (وظائف مكررة)
+    application.job_queue.run_repeating(scheduled_jobs, interval=3600, first=0)
+    application.job_queue.run_repeating(send_auto_verse, interval=2100, first=0)  # كل 35 دقيقة
     
     # بدء البوت
-    updater.start_polling()
+    application.run_polling()
     logger.info("تم تشغيل البوت بنجاح...")
-    updater.idle()
 
 if __name__ == "__main__":
     main()
