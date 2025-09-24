@@ -5,7 +5,7 @@ import time
 import filetype   
 from datetime import datetime, timedelta
 from telegram import Update
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 # إعدادات البوت
 BOT_TOKEN = "7882447585:AAFRX4Q6eqhN5uoJvv45O3ACrY7fvFFF2nI"
@@ -76,15 +76,12 @@ active_users = set()
 user_data = {}
 
 def get_algeria_time():
-    """الحصول على وقت الجزائر مع التنسيق"""
     now = datetime.utcnow() + timedelta(hours=1)  # UTC+1
     return now, now.strftime("%H:%M")
 
 def get_next_adhkar_time():
-    """حساب الوقت المتبقي للأذكار القادمة"""
     now, _ = get_algeria_time()
     hour = now.hour
-    
     if hour < 6:
         next_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
         adhkar_type = "أذكار الصباح"
@@ -97,224 +94,42 @@ def get_next_adhkar_time():
     else:
         next_time = (now + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
         adhkar_type = "أذكار الصباح"
-    
     time_left = next_time - now
     hours = time_left.seconds // 3600
     minutes = (time_left.seconds % 3600) // 60
-    
     return adhkar_type, hours, minutes, next_time.strftime("%H:%M")
 
-def get_surah_audio(surah_number):
-    """الحصول على سورة كاملة بصوت"""
-    try:
-        response = requests.get(f"https://api.alquran.cloud/v1/surah/{surah_number}/ar.alafasy")
-        data = response.json()
-        
-        if data['code'] == 200:
-            return {
-                'name': data['data']['name'],
-                'english_name': data['data']['englishName'],
-                'ayahs': data['data']['ayahs']
-            }
-    except Exception as e:
-        logger.error(f"خطأ في جلب السورة: {e}")
-    return None
-
-def get_random_verse_with_audio():
-    """الحصول على آية عشوائية مع صوت"""
-    try:
-        surah = random.randint(1, 114)
-        response = requests.get(f"https://api.alquran.cloud/v1/surah/{surah}/ar.alafasy")
-        data = response.json()
-        
-        if data['code'] == 200:
-            verses = data['data']['ayahs']
-            verse = random.choice(verses)
-            return {
-                'text': verse['text'],
-                'audio': verse['audio'],
-                'surah_name': data['data']['name'],
-                'ayah_number': verse['numberInSurah']
-            }
-    except Exception as e:
-        logger.error(f"خطأ في جلب الآية: {e}")
-    return None
-
-def send_quran_audio(update: Update, context: CallbackContext):
-    """إرسال تلاوة عشوائية"""
-    now, time_str = get_algeria_time()
-    verse = get_random_verse_with_audio()
-    
-    if verse:
-        try:
-            update.message.reply_text(
-                f"📖 تم اختيار آية من سورة {verse['surah_name']} - الآية {verse['ayah_number']}"
-            )
-            context.bot.send_audio(
-                update.effective_chat.id,
-                audio=verse['audio'],
-                caption=f"🎧 تلاوة قرآنية | {time_str}"
-            )
-        except Exception as e:
-            logger.error(f"خطأ في إرسال التلاوة: {e}")
-            update.message.reply_text("⚠️ حدث خطأ أثناء إرسال التلاوة")
-    else:
-        update.message.reply_text("⚠️ تعذر جلب التلاوة، حاول لاحقاً")
-
-def send_surah(update: Update, context: CallbackContext):
-    """إرسال سورة كاملة"""
-    now, time_str = get_algeria_time()
-    
-    if not context.args:
-        update.message.reply_text("⚠️ يرجى تحديد رقم السورة (1-114)\nمثال: /sura 1")
-        return
-    
-    try:
-        surah_num = int(context.args[0])
-        if not 1 <= surah_num <= 114:
-            raise ValueError
-    except:
-        update.message.reply_text("⚠️ رقم السورة يجب أن يكون بين 1 و114")
-        return
-    
-    surah = get_surah_audio(surah_num)
-    if not surah:
-        update.message.reply_text("⚠️ تعذر جلب السورة، حاول لاحقاً")
-        return
-    
-    update.message.reply_text(f"📖 جاري إرسال سورة {surah['name']}...")
-    
-    for ayah in surah['ayahs']:
-        try:
-            context.bot.send_audio(
-                chat_id=update.effective_chat.id,
-                audio=ayah['audio'],
-                caption=f"{surah['name']} - الآية {ayah['numberInSurah']}",
-                timeout=30
-            )
-            time.sleep(1)
-        except Exception as e:
-            logger.error(f"خطأ في إرسال الآية: {e}")
-            continue
-
-def send_morning_adhkar(context: CallbackContext):
-    now, time_str = get_algeria_time()
-    for uid in active_users:
-        try:
-            context.bot.send_message(
-                uid,
-                f"🌞 ذكر الصباح | {time_str}\n\n{random.choice(MORNING_ADHKAR)}"
-            )
-        except Exception as e:
-            logger.error(f"خطأ في إرسال ذكر الصباح للمستخدم {uid}: {e}")
-            active_users.discard(uid)
-
-def send_evening_adhkar(context: CallbackContext):
-    now, time_str = get_algeria_time()
-    for uid in active_users:
-        try:
-            context.bot.send_message(
-                uid,
-                f"🌙 ذكر المساء | {time_str}\n\n{random.choice(EVENING_ADHKAR)}"
-            )
-        except Exception as e:
-            logger.error(f"خطأ في إرسال ذكر المساء للمستخدم {uid}: {e}")
-            active_users.discard(uid)
-
-def send_night_adhkar(context: CallbackContext):
-    now, time_str = get_algeria_time()
-    for uid in active_users:
-        try:
-            context.bot.send_message(
-                uid,
-                f"🌌 ذكر النوم | {time_str}\n\n{random.choice(NIGHT_ADHKAR)}"
-            )
-        except Exception as e:
-            logger.error(f"خطأ في إرسال ذكر الليل للمستخدم {uid}: {e}")
-            active_users.discard(uid)
-
-def send_auto_verse(context: CallbackContext):
-    """إرسال آية قرآنية تلقائية كل 35 دقيقة"""
+async def send_quran_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now, time_str = get_algeria_time()
     verse = random.choice(QURAN_VERSES)
-    
-    for uid in active_users:
-        try:
-            context.bot.send_message(
-                uid,
-                f"📖 آية قرآنية تلقائية | {time_str}\n\n"
-                f"{verse}\n\n"
-                f"🔖 {random.choice(['تأمل هذه الآية', 'اجعل هذه الآية ذكرك اليوم', 'ما أعظم كلام الله'])}"
-            )
-        except Exception as e:
-            logger.error(f"خطأ في إرسال الآية التلقائية للمستخدم {uid}: {e}")
-            active_users.discard(uid)
+    await update.message.reply_text(f"📖 آية عشوائية | {time_str}\n\n{verse}")
 
-def send_random_adhkar(update: Update, context: CallbackContext):
-    """إرسال ذكر عشوائي"""
+async def send_random_adhkar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now, time_str = get_algeria_time()
     all_adhkar = MORNING_ADHKAR + EVENING_ADHKAR + NIGHT_ADHKAR
-    update.message.reply_text(
+    await update.message.reply_text(
         f"📿 ذكر عشوائي | {time_str}\n\n{random.choice(all_adhkar)}"
     )
 
-def send_random_verse(update: Update, context: CallbackContext):
-    """إرسال آية قرآنية مكتوبة عشوائية"""
+async def send_random_verse(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now, time_str = get_algeria_time()
     verse = random.choice(QURAN_VERSES)
-    
-    response = (
-        f"📖 آية قرآنية | {time_str}\n\n"
-        f"{verse}\n\n"
-        f"🔖 {random.choice(['تذكر هذه الآية اليوم', 'اجعل هذه الآية شعارك اليوم', 'ما أعظم كلام الله'])}"
-    )
-    
-    update.message.reply_text(response)
+    response = f"📖 آية قرآنية | {time_str}\n\n{verse}"
+    await update.message.reply_text(response)
 
-def time_left(update: Update, context: CallbackContext):
-    """عرض الوقت المتبقي للأذكار القادمة"""
+async def time_left(update: Update, context: ContextTypes.DEFAULT_TYPE):
     adhkar_type, hours, minutes, next_time = get_next_adhkar_time()
     message = (
         f"⏳ الأذكار القادمة: {adhkar_type}\n"
         f"⏱ الوقت المتبقي: {hours} ساعة و {minutes} دقيقة\n"
         f"🕒 الموعد: {next_time}"
     )
-    update.message.reply_text(message)
+    await update.message.reply_text(message)
 
-def list_users(update: Update, context: CallbackContext):
-    """عرض قائمة المستخدمين مع الأسماء (للمشرف فقط)"""
-    if update.effective_user.id != ADMIN_ID:
-        update.message.reply_text("⚠️ هذا الأمر متاح للمشرف فقط!")
-        return
-    
-    if not active_users:
-        update.message.reply_text("لا يوجد مستخدمين نشطين حالياً")
-        return
-    
-    users_list = []
-    for uid in active_users:
-        user_info = user_data.get(uid, {})
-        name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
-        username = f"@{user_info.get('username', '')}" if user_info.get('username') else "لا يوجد معرف"
-        
-        user_entry = f"👤 {name} (ID: {uid}) - {username}"
-        users_list.append(user_entry)
-    
-    users_text = "\n".join(users_list)
-    
-    update.message.reply_text(
-        f"📊 إحصائيات البوت:\n"
-        f"• عدد المستخدمين النشطين: {len(active_users)}\n"
-        f"• آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"قائمة المستخدمين:\n{users_text}"
-    )
-
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now, time_str = get_algeria_time()
     user = update.effective_user
     uid = user.id
-    
-    # تخزين معلومات المستخدم
     active_users.add(uid)
     user_data[uid] = {
         'first_name': user.first_name,
@@ -322,7 +137,6 @@ def start(update: Update, context: CallbackContext):
         'username': user.username,
         'join_date': now.strftime("%Y-%m-%d %H:%M:%S")
     }
-    
     start_msg = f"""
 ✨ *مرحباً بك في بوت الأذكار والقرآن* ✨
 
@@ -332,7 +146,6 @@ def start(update: Update, context: CallbackContext):
 ⚡️ *الأوامر المتاحة:*
 /start - عرض هذه الرسالة
 /quran - تلاوة قرآنية عشوائية
-/sura [رقم] - سورة كاملة (مثال: /sura 1)
 /adhkar - ذكر عشوائي
 /verse - آية قرآنية مكتوبة
 /timeleft - الوقت المتبقي للأذكار القادمة
@@ -341,41 +154,17 @@ def start(update: Update, context: CallbackContext):
 
 تم تطوير البوت بواسطة خليل
 """
-    update.message.reply_text(start_msg, parse_mode="Markdown")
-
-def scheduled_jobs(context: CallbackContext):
-    """المهام المجدولة"""
-    now, time_str = get_algeria_time()
-    hour = now.hour
-    
-    if 5 <= hour < 10:  # الصباح من 5 إلى 10 ص
-        send_morning_adhkar(context)
-    elif 17 <= hour < 21:  # المساء من 5 إلى 9 م
-        send_evening_adhkar(context)
-    elif 21 <= hour or hour < 5:  # الليل من 9 م إلى 5 ص
-        send_night_adhkar(context)
+    await update.message.reply_text(start_msg, parse_mode="Markdown")
 
 def main():
-    # استبدل Updater بـ Application
     application = Application.builder().token(BOT_TOKEN).build()
-    
-    # تعريف الأوامر
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("quran", send_quran_audio))
-    application.add_handler(CommandHandler("sura", send_surah))
     application.add_handler(CommandHandler("adhkar", send_random_adhkar))
     application.add_handler(CommandHandler("verse", send_random_verse))
     application.add_handler(CommandHandler("timeleft", time_left))
-    application.add_handler(CommandHandler("users", list_users))
-    
-    # الجدولة (وظائف مكررة)
-    application.job_queue.run_repeating(scheduled_jobs, interval=3600, first=0)
-    application.job_queue.run_repeating(send_auto_verse, interval=2100, first=0)  # كل 35 دقيقة
-    
-    # بدء البوت
     application.run_polling()
     logger.info("تم تشغيل البوت بنجاح...")
 
 if __name__ == "__main__":
     main()
-
