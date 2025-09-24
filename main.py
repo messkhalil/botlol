@@ -2,6 +2,7 @@ import random
 import requests
 import logging
 import time
+import filetype   
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
@@ -379,3 +380,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
